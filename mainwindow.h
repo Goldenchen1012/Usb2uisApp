@@ -1,0 +1,39 @@
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QMainWindow>
+#include <QByteArray>
+#include <QEventLoop>
+#include <QTimer>
+#include <QElapsedTimer>
+#include "usb2uis_interface.h"
+
+QT_BEGIN_NAMESPACE
+namespace Ui { class MainWindow; }
+QT_END_NAMESPACE
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+private slots:
+    void on_btnConnect_clicked();
+    void on_btnApplyConfig_clicked();
+    void on_btnSpiRead_clicked();
+    void on_btnSpiWrite_clicked();
+
+private:
+    Ui::MainWindow *ui;
+
+    bool deviceConnected = false;
+    BYTE deviceIndex = 0xFF;
+
+    bool parseHexString(const QString& input, QByteArray& output);
+    void delayBlockingMs(int ms);
+    void delayBlockingUs(int usec);
+};
+#endif // MAINWINDOW_H

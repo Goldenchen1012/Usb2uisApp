@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>751</width>
+      <height>531</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>1</number>
+    </property>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string>Device Setting</string>
+     </attribute>
+     <widget class="QComboBox" name="comboSpiSpeed">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>63</y>
+        <width>121</width>
+        <height>23</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="comboSpiMode">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>93</y>
+        <width>121</width>
+        <height>23</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineReadTimeout">
+      <property name="geometry">
+       <rect>
+        <x>60</x>
+        <y>133</y>
+        <width>61</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineWriteTimeout">
+      <property name="geometry">
+       <rect>
+        <x>60</x>
+        <y>163</y>
+        <width>61</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="btnApplyConfig">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>203</y>
+        <width>121</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Set</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="btnConnect">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>20</y>
+        <width>121</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Connect</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_2">
+     <attribute name="title">
+      <string>SPI RD/WR</string>
+     </attribute>
+     <widget class="QLineEdit" name="lineReadCmd">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>40</y>
+        <width>131</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineReadBytes">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>80</y>
+        <width>41</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineWriteCmd">
+      <property name="geometry">
+       <rect>
+        <x>265</x>
+        <y>40</y>
+        <width>131</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineWriteData">
+      <property name="geometry">
+       <rect>
+        <x>265</x>
+        <y>80</y>
+        <width>301</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="btnSpiRead">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>130</y>
+        <width>80</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>SPI Read</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="btnSpiWrite">
+      <property name="geometry">
+       <rect>
+        <x>265</x>
+        <y>130</y>
+        <width>80</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>SPI Write</string>
+      </property>
+     </widget>
+     <widget class="QPlainTextEdit" name="textSpiReadResult">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>190</y>
+        <width>681</width>
+        <height>251</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineSpiDelayMs">
+      <property name="geometry">
+       <rect>
+        <x>652</x>
+        <y>40</y>
+        <width>51</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label">
+      <property name="geometry">
+       <rect>
+        <x>570</x>
+        <y>20</y>
+        <width>141</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Delay Time (ms) after CMD</string>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>800</width>
+     <height>20</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
