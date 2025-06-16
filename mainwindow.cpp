@@ -202,6 +202,11 @@ void MainWindow::on_btnSpiWrite_clicked()
     ui->textSpiReadResult->appendPlainText(QString("[%1] Wrote: %2").arg(timeStr, result.trimmed()));
 }
 
+void MainWindow::on_btnClearResult_clicked()
+{
+    ui->textSpiReadResult->clear();
+}
+
 bool MainWindow::parseHexString(const QString& input, QByteArray& output)
 {
     output.clear();

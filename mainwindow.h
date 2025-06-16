@@ -25,6 +25,7 @@ private slots:
     void on_btnApplyConfig_clicked();
     void on_btnSpiRead_clicked();
     void on_btnSpiWrite_clicked();
+    void on_btnClearResult_clicked();
 
 private:
     Ui::MainWindow *ui;
