@@ -40,12 +40,28 @@ MainWindow::MainWindow(QWidget *parent)
 
     //For Test
     //--------------------------------------
-    ui->lineReadCmd->setText("0x00 0x04 0x07 0xC2");
-    ui->lineWriteCmd->setText("0x00 0x02 0x2B 0x0A");
+    ui->lineReadCmd->setText("0x00 0x02 0x2B 0x0A");
+    ui->lineWriteCmd->setText("0x00 0x01 0x3D 0x6E");
     ui->lineReadBytes->setText("8");
-    ui->lineWriteCmd->setText("0x00 0x02 0x2B 0x0A");
-    ui->lineWriteData->setText("0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08");
+    ui->textWriteData->setPlainText("0x81 0x00 0x00 0xFF 0x03 0x00 0x02 0x8E");
     //--------------------------------------
+
+
+    ui->lineDummyCount->setText("2");
+    ui->lineDummyCount->setValidator(new QIntValidator(0, 256, this));
+    ui->lineDummyCount_2->setText("2");
+    ui->lineDummyCount_2->setValidator(new QIntValidator(0, 256, this));
+
+    ui->lineReadRepeatCount->setText("0");
+    ui->lineReadRepeatCount->setValidator(new QIntValidator(0, 999999, this));
+    ui->lineReadRepeatInterval->setText("500");
+    ui->lineReadRepeatInterval->setValidator(new QIntValidator(0, 60000, this));
+
+    ui->lineWriteRepeatCount->setText("0");
+    ui->lineWriteRepeatCount->setValidator(new QIntValidator(0, 999999, this));
+    ui->lineWriteRepeatInterval->setText("500");
+    ui->lineWriteRepeatInterval->setValidator(new QIntValidator(0, 60000, this));
+
 }
 
 MainWindow::~MainWindow()
@@ -83,7 +99,7 @@ void MainWindow::on_btnApplyConfig_clicked()
     BYTE configByte = (modeIndex << 4) | speedIndex;        // m/s bit7=0
 
     DWORD timeout = (ui->lineWriteTimeout->text().toUShort() << 16) |
-                     ui->lineReadTimeout->text().toUShort();
+            ui->lineReadTimeout->text().toUShort();
 
     if (!Usb2UisInterface::USBIO_SPISetConfig(deviceIndex, configByte, timeout)) {
         QMessageBox::warning(this, "錯誤", "SPI 設定失敗");
@@ -105,41 +121,83 @@ void MainWindow::on_btnSpiRead_clicked()
     }
 
     int delayMs = ui->lineSpiDelayMs->text().toInt();
+    int dummyCount = ui->lineDummyCount->text().toInt();      // 預先 Dummy 0xFF 個數
 
-    // ✅ 拉 LOW: 啟動傳輸階段
-    Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+    // 重複次數與間隔
+    bool      repeatEnable   = ui->chkReadRepeatEnable->isChecked();
+    int32_t   repeatCount    = ui->lineReadRepeatCount->text().toInt();
+    int32_t   repeatInterval = ui->lineReadRepeatInterval->text().toInt();
 
-    // 傳送命令後延遲
-    QByteArray dummyBuffer;
-    Usb2UisInterface::USBIO_SPIWrite(deviceIndex,
-           (BYTE*)cmd.data(), cmd.size(), nullptr, 0);
+    int32_t iteration = 0;
 
-    // 延遲（保持 CS LOW）
-    if (delayMs > 0)
+    while (true)
     {
-        // 阻塞延遲
-        delayBlockingMs(delayMs);
+
+        // Step 1: 傳送 Dummy 0xFF
+        //------------------------------------------------------------------------------------
+        // ✅ 拉 LOW: 啟動傳輸階段
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+
+        if (dummyCount > 0) {
+            QByteArray dummy(dummyCount, char(0xFF));
+            if (!Usb2UisInterface::USBIO_SPIWrite(deviceIndex, nullptr, 0, (BYTE*)dummy.data(), dummy.size()))
+            {
+                QMessageBox::warning(this, "錯誤", "Dummy Bytes 傳送失敗");
+                Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+                return;
+            }
+        }
+
+        delayBlockingUs(500);
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+        delayBlockingMs(1);            //Refer AFE Spec.
+        //+-----------------------------------------------------------------------------------
+
+
+        // Step 2: 傳送命令後延遲
+        //------------------------------------------------------------------------------------
+        // ✅ 拉 LOW: 啟動傳輸階段
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+
+        QByteArray dummyBuffer;
+        Usb2UisInterface::USBIO_SPIWrite(deviceIndex,(BYTE*)cmd.data(), cmd.size(), nullptr, 0);
+
+        // 延遲（保持 CS LOW）
+        if (delayMs > 0)
+        {
+            // 阻塞延遲
+            delayBlockingMs(delayMs);
+        }
+
+        recvBuffer.resize(readSize);
+        if (!Usb2UisInterface::USBIO_SPIRead(deviceIndex,
+                                             nullptr, 0, (BYTE*)recvBuffer.data(), readSize)) {
+            QMessageBox::warning(this, "錯誤", "SPI讀取失敗");
+            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);  // 拉回 HIGH
+            return;
+        }
+        //------------------------------------------------------------------------------------
+
+        // ✅ 拉 HIGH: 結束傳輸階段
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+
+        QString result;
+        for (BYTE b : recvBuffer)
+            result += QString("0x%1 ").arg(b, 2, 16, QChar('0')).toUpper();
+
+        result.replace("X","x");
+
+        QString timeStr = QTime::currentTime().toString("HH:mm:ss.zzz");
+        ui->textSpiReadResult->appendPlainText(QString("[%1] Read : %2").arg(timeStr, result.trimmed()));
+
+        iteration++;
+
+        if (!repeatEnable || (repeatCount > 0 && iteration >= repeatCount)) break;
+
+        QCoreApplication::processEvents(); // allow checkbox to be unchecked during loop
+        if (!ui->chkReadRepeatEnable->isChecked()) break;
+        QThread::msleep(repeatInterval);
     }
-
-    recvBuffer.resize(readSize);
-    if (!Usb2UisInterface::USBIO_SPIRead(deviceIndex,
-        nullptr, 0, (BYTE*)recvBuffer.data(), readSize)) {
-        QMessageBox::warning(this, "錯誤", "SPI讀取失敗");
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);  // 拉回 HIGH
-        return;
-    }
-
-    // ✅ 拉 HIGH: 結束傳輸階段
-    Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
-
-    QString result;
-    for (BYTE b : recvBuffer)
-        result += QString("0x%1 ").arg(b, 2, 16, QChar('0')).toUpper();
-
-    result.replace("X","x");
-
-    QString timeStr = QTime::currentTime().toString("HH:mm:ss.zzz");
-    ui->textSpiReadResult->appendPlainText(QString("[%1] Read : %2").arg(timeStr, result.trimmed()));
 
 }
 
@@ -155,51 +213,93 @@ void MainWindow::on_btnSpiWrite_clicked()
         return;
     }
 
-    if (!parseHexString(ui->lineWriteData->text(), data)) {
-        QMessageBox::warning(this, "錯誤", "請輸入HEX格式資料");
+    if (!parseHexString(ui->textWriteData->toPlainText(), data)) {
+        QMessageBox::warning(this, "錯誤", "請輸入正確 HEX 格式資料");
         return;
     }
 
     int delayMs = ui->lineSpiDelayMs->text().toInt();
+    int dummyCount = ui->lineDummyCount_2->text().toInt();      // 預先 Dummy 0xFF 個數
 
-    // ✅ 拉 LOW: 啟動傳輸階段
-    Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+    // 重複次數與間隔
+    bool     repeatEnable   = ui->chkWriteRepeatEnable->isChecked();
+    int32_t  repeatCount    = ui->lineWriteRepeatCount->text().toInt();
+    int32_t  repeatInterval = ui->lineWriteRepeatInterval->text().toInt();
 
-    Usb2UisInterface::USBIO_SPIWrite(deviceIndex,
-           (BYTE*)cmd.data(), cmd.size(), nullptr, 0);
+    int32_t iteration = 0;
+    while (true) {
+
+        // Step 1: 傳送 Dummy 0xFF
+        //------------------------------------------------------------------------------------
+        // ✅ 拉 LOW: 啟動傳輸階段
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+
+        if (dummyCount > 0) {
+            QByteArray dummy(dummyCount, char(0xFF));
+            if (!Usb2UisInterface::USBIO_SPIWrite(deviceIndex, nullptr, 0, (BYTE*)dummy.data(), dummy.size()))
+            {
+                QMessageBox::warning(this, "錯誤", "Dummy Bytes 傳送失敗");
+                Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+                return;
+            }
+        }
+
+        delayBlockingUs(500);
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+        delayBlockingMs(1);            //Refer AFE Spec.
+        //+-----------------------------------------------------------------------------------
+
+        // Step 2: 傳送命令後延遲
+        //------------------------------------------------------------------------------------
+        // ✅ 拉 LOW: 啟動傳輸階段
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+
+        Usb2UisInterface::USBIO_SPIWrite(deviceIndex,
+                                         (BYTE*)cmd.data(), cmd.size(), nullptr, 0);
 
 
-    Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
 
-    // 延遲（保持 CS LOW）
-    if (delayMs > 0)
-    {
-        // 阻塞延遲
-        delayBlockingMs(delayMs);
+        // 延遲（保持 CS LOW）
+        if (delayMs > 0)
+        {
+            // 阻塞延遲
+            delayBlockingMs(delayMs);
+        }
+
+        delayBlockingUs(500); //必須先阻塞時間， 傳送時序問題延遲500us以上
+        if (!Usb2UisInterface::USBIO_SPIWrite(deviceIndex,
+                                              nullptr, 0, (BYTE*)data.data(), data.size()))
+        {
+            QMessageBox::warning(this, "錯誤", "SPI資料寫入失敗");
+            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);  // 拉回 HIGH
+            return;
+        }
+        delayBlockingUs(500); //必須先阻塞時間， 傳送時序問題延遲500us以上
+
+        // ✅ 拉 HIGH: 結束傳輸階段
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+        //------------------------------------------------------------------------------------
+
+
+        // 顯示寫入資料 HEX 字串到 textSpiReadResult
+        QString result;
+        for (BYTE b : data)
+            result += QString("0x%1 ").arg(b, 2, 16, QChar('0')).toUpper();
+
+        result.replace("X","x");
+
+        QString timeStr = QTime::currentTime().toString("HH:mm:ss.zzz");
+        ui->textSpiReadResult->appendPlainText(QString("[%1] Wrote: %2").arg(timeStr, result.trimmed()));
+
+        iteration++;
+
+        if (!repeatEnable || (repeatCount > 0 && iteration >= repeatCount)) break;
+
+        QCoreApplication::processEvents();
+        if (!ui->chkWriteRepeatEnable->isChecked()) break;
+        QThread::msleep(repeatInterval);
     }
-
-    delayBlockingUs(500); //必須先阻塞時間， 傳送時序問題延遲500us以上
-    if (!Usb2UisInterface::USBIO_SPIWrite(deviceIndex,
-        nullptr, 0, (BYTE*)data.data(), data.size()))
-    {
-        QMessageBox::warning(this, "錯誤", "SPI資料寫入失敗");
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);  // 拉回 HIGH
-        return;
-    }
-    delayBlockingUs(500); //必須先阻塞時間， 傳送時序問題延遲500us以上
-
-    // ✅ 拉 HIGH: 結束傳輸階段
-    Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
-
-    // 顯示寫入資料 HEX 字串到 textSpiReadResult
-    QString result;
-    for (BYTE b : data)
-        result += QString("0x%1 ").arg(b, 2, 16, QChar('0')).toUpper();
-
-    result.replace("X","x");
-
-    QString timeStr = QTime::currentTime().toString("HH:mm:ss.zzz");
-    ui->textSpiReadResult->appendPlainText(QString("[%1] Wrote: %2").arg(timeStr, result.trimmed()));
 }
 
 void MainWindow::on_btnClearResult_clicked()
