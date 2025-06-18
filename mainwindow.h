@@ -26,6 +26,15 @@ private slots:
     void on_btnSpiRead_clicked();
     void on_btnSpiWrite_clicked();
     void on_btnClearResult_clicked();
+    // 按鈕
+    void on_btnLoadReadCmdList_clicked();
+    void on_btnLoadWriteCmdList_clicked();
+    void on_btnLoadWriteDataList_clicked();
+
+    // ComboBox 選擇
+    void onReadCmdChosen(const QString &);
+    void onWriteCmdChosen(const QString &);
+    void onWriteDataChosen(const QString &);
 
 private:
     Ui::MainWindow *ui;

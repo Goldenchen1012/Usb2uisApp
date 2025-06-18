@@ -7,11 +7,51 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QTime>
+#include <QFile>
+#include <QTextStream>
+#include <QDir>
+#include <QDebug>
+#include <QRegularExpression>
+
 
 #define EMULATOR_APP_NAME_STR         QString("Usb2uisApp")
 #define EMULATOR_APP_VERSION_STR      QString("V1.0")
 
 BYTE deviceIndex = 0;
+
+/* 讀檔並回傳 <顯示文字, HEX字串> 清單，只取第一欄=1 的行 */
+static QList<QPair<QString, QString>> loadCmdFile(const QString &fileName)
+{
+    QList<QPair<QString, QString>> list;
+
+    // 使用程式執行檔所在目錄為 base path
+    QString fullPath = QCoreApplication::applicationDirPath() + QDir::separator() + fileName;
+
+    qDebug() << "[DEBUG] Try to load file:" << fullPath;
+
+    QFile f(fullPath);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "[ERROR] Cannot open file:" << fullPath;
+        return list;
+    }
+
+    QTextStream ts(&f);
+    const QRegularExpression re("^\\s*(\\d)\\s*,\\s*\"([^\"]+)\"\\s*,\\s*(.+)$");
+
+    while (!ts.atEnd()) {
+        const QString line = ts.readLine();
+        auto m = re.match(line);
+        if (!m.hasMatch()) continue;
+        if (m.captured(1) != "1") continue;
+
+        const QString label = m.captured(2);
+        const QString hex = m.captured(3).trimmed();
+
+        list.append({label, hex});
+    }
+
+    return list;
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -61,6 +101,18 @@ MainWindow::MainWindow(QWidget *parent)
     ui->lineWriteRepeatCount->setValidator(new QIntValidator(0, 999999, this));
     ui->lineWriteRepeatInterval->setText("500");
     ui->lineWriteRepeatInterval->setValidator(new QIntValidator(0, 60000, this));
+
+    // Connect 按鈕點擊事件 → 對應的槽函數
+    connect(ui->btnLoadReadCmdList,    &QPushButton::clicked, this, &MainWindow::on_btnLoadReadCmdList_clicked);
+    connect(ui->btnLoadWriteCmdList,   &QPushButton::clicked, this, &MainWindow::on_btnLoadWriteCmdList_clicked);
+    connect(ui->btnLoadWriteDataList,  &QPushButton::clicked, this, &MainWindow::on_btnLoadWriteDataList_clicked);
+
+    connect(ui->comboReadCmdList,   &QComboBox::currentTextChanged,
+            this, &MainWindow::onReadCmdChosen);
+    connect(ui->comboWriteCmdList,  &QComboBox::currentTextChanged,
+            this, &MainWindow::onWriteCmdChosen);
+    connect(ui->comboWriteDataList, &QComboBox::currentTextChanged,
+            this, &MainWindow::onWriteDataChosen);
 
 }
 
@@ -342,6 +394,83 @@ void MainWindow::delayBlockingUs(int usec)
     timer.start();
     while (timer.nsecsElapsed() < usec * 1000) {
         // busy wait
+    }
+}
+
+/* --------- ① 讀取 READ-CMD 清單按鈕 ---------- */
+void MainWindow::on_btnLoadReadCmdList_clicked()
+{
+    ui->comboReadCmdList->clear();
+    ui->comboReadCmdList->setProperty("hexList", QVariant());   // 清旗標
+
+    auto list = loadCmdFile("SPI_READ_CMD_LIST.txt");
+    QVariantList hexList;
+    for (const auto &p : list) {
+        ui->comboReadCmdList->addItem(p.first);
+        hexList << p.second;
+    }
+    ui->comboReadCmdList->setProperty("hexList", hexList);
+    ui->comboReadCmdList->setCurrentIndex(-1);
+}
+
+/* Combo 被選中 → 將 HEX 填入 lineReadCmd */
+void MainWindow::onReadCmdChosen(const QString &text)
+{
+    auto hexList = ui->comboReadCmdList->property("hexList").toList();
+    int idx = ui->comboReadCmdList->currentIndex();
+    if (idx >= 0 && idx < hexList.size()) {
+        ui->lineReadCmd->clear();
+        ui->lineReadCmd->setText(hexList[idx].toString());
+    }
+}
+
+/* --------- ② 讀取 WRITE-CMD 清單按鈕 ---------- */
+void MainWindow::on_btnLoadWriteCmdList_clicked()
+{
+    ui->comboWriteCmdList->clear();
+    QVariantList hexList;
+
+    for (const auto &p : loadCmdFile("SPI_WRITE_CMD_LIST.txt")) {
+        ui->comboWriteCmdList->addItem(p.first);
+        hexList << p.second;
+    }
+    ui->comboWriteCmdList->setProperty("hexList", hexList);
+    ui->comboWriteCmdList->setCurrentIndex(-1);
+}
+
+/* Combo 被選中 → 將 HEX 填入 lineWriteCmd */
+void MainWindow::onWriteCmdChosen(const QString &)
+{
+    auto hexList = ui->comboWriteCmdList->property("hexList").toList();
+    int idx = ui->comboWriteCmdList->currentIndex();
+    if (idx >= 0 && idx < hexList.size()) {
+        ui->lineWriteCmd->clear();
+        ui->lineWriteCmd->setText(hexList[idx].toString());
+    }
+}
+
+/* --------- ③ 讀取 WRITE-DATA 清單按鈕 ---------- */
+void MainWindow::on_btnLoadWriteDataList_clicked()
+{
+    ui->comboWriteDataList->clear();
+    QVariantList hexList;
+
+    for (const auto &p : loadCmdFile("SPI_WRITE_DATA_LIST.txt")) {
+        ui->comboWriteDataList->addItem(p.first);
+        hexList << p.second;
+    }
+    ui->comboWriteDataList->setProperty("hexList", hexList);
+    ui->comboWriteDataList->setCurrentIndex(-1);
+}
+
+/* Combo 被選中 → 將 HEX 填入 textWriteData (多行元件) */
+void MainWindow::onWriteDataChosen(const QString &)
+{
+    auto hexList = ui->comboWriteDataList->property("hexList").toList();
+    int idx = ui->comboWriteDataList->currentIndex();
+    if (idx >= 0 && idx < hexList.size()) {
+        ui->textWriteData->clear();
+        ui->textWriteData->setPlainText(hexList[idx].toString());
     }
 }
 
