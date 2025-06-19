@@ -53,6 +53,48 @@ static QList<QPair<QString, QString>> loadCmdFile(const QString &fileName)
     return list;
 }
 
+void MainWindow::loadReadCmdSet()
+{
+    mapSetDescription.clear();
+    ui->comboReadCmdSet->clear();
+
+    QFile f(QCoreApplication::applicationDirPath() + "/SPI_READ_CMD_SET.txt");
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+
+    QTextStream ts(&f);
+    while (!ts.atEnd()) {
+        const QString line = ts.readLine();
+        QRegularExpression re("^\\s*(\\d)\\s*,\\s*(\\d+)\\s*,\\s*\"([^\"]+)\"\\s*$");
+        auto m = re.match(line);
+        if (m.hasMatch() && m.captured(1) == "1") {
+            int setId = m.captured(2).toInt();
+            QString desc = m.captured(3);
+            mapSetDescription[setId] = desc;
+            ui->comboReadCmdSet->addItem(desc, setId);
+        }
+    }
+}
+
+void MainWindow::loadReadCmdList()
+{
+    mapSetToCmds.clear();
+
+    QFile f(QCoreApplication::applicationDirPath() + "/SPI_READ_CMD_LIST.txt");
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+
+    QTextStream ts(&f);
+    while (!ts.atEnd()) {
+        const QString line = ts.readLine();
+        QRegularExpression re("^\\s*(\\d)\\s*,\\s*(\\d+)\\s*,\\s*\"[^\"]*\"\\s*,\\s*(.+)$");
+        auto m = re.match(line);
+        if (m.hasMatch() && m.captured(1) == "1") {
+            int setId = m.captured(2).toInt();
+            QString hex = m.captured(3).trimmed();
+            mapSetToCmds.insert(setId, hex);
+        }
+    }
+}
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -113,6 +155,9 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onWriteCmdChosen);
     connect(ui->comboWriteDataList, &QComboBox::currentTextChanged,
             this, &MainWindow::onWriteDataChosen);
+
+    connect(ui->btnLoadReadCmdSet, &QPushButton::clicked, this, &MainWindow::on_btnLoadReadCmdSet_clicked);
+    connect(ui->comboReadCmdSet, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::on_comboReadCmdSet_currentIndexChanged);
 
 }
 
@@ -247,6 +292,86 @@ void MainWindow::on_btnSpiRead_clicked()
         if (!repeatEnable || (repeatCount > 0 && iteration >= repeatCount)) break;
 
         QCoreApplication::processEvents(); // allow checkbox to be unchecked during loop
+        if (!ui->chkReadRepeatEnable->isChecked()) break;
+        QThread::msleep(repeatInterval);
+    }
+
+}
+
+
+void MainWindow::on_btnSpiRead2_clicked()
+{
+    if (!deviceConnected) return;
+
+    int setIndex = ui->comboReadCmdSet->currentIndex();
+    if (setIndex < 0) {
+        QMessageBox::warning(this, "錯誤", "請先選擇 SPI READ CMD SET");
+        return;
+    }
+
+    int setId = ui->comboReadCmdSet->itemData(setIndex).toInt();
+    QStringList cmdList = mapSetToCmds.values(setId);
+    if (cmdList.isEmpty()) return;
+
+    int repeatCount = ui->lineReadRepeatCount->text().toInt();
+    bool repeatEnable = ui->chkReadRepeatEnable->isChecked();
+    int repeatInterval = ui->lineReadRepeatInterval->text().toInt();
+
+    int delayMs = ui->lineSpiDelayMs->text().toInt();
+    int dummyCount = ui->lineDummyCount->text().toInt();
+    int readSize = ui->lineReadBytes->text().toInt();
+
+    int iteration = 0;
+    while (true) {
+        for (int i = 0; i < cmdList.size(); ++i) {
+            QString hex = cmdList[i];
+            QByteArray cmd;
+            if (!parseHexString(hex, cmd)) continue;
+
+            // ListView 指示目前執行第幾條
+            if (cmdListModel) {
+                QModelIndex index = cmdListModel->index(i);
+                ui->listViewReadCmds->setCurrentIndex(index);
+            }
+
+            // Dummy
+            Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+            if (dummyCount > 0) {
+                QByteArray dummy(dummyCount, char(0xFF));
+                Usb2UisInterface::USBIO_SPIWrite(deviceIndex, nullptr, 0, (BYTE*)dummy.data(), dummyCount);
+            }
+            delayBlockingUs(500);
+            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+            //delayBlockingMs(1);
+            delayBlockingUs(500);
+
+            // 指令傳送
+            Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+            Usb2UisInterface::USBIO_SPIWrite(deviceIndex, (BYTE*)cmd.data(), cmd.size(), nullptr, 0);
+            if (delayMs > 0) delayBlockingMs(delayMs);
+
+            QByteArray recv;
+            recv.resize(readSize);
+            Usb2UisInterface::USBIO_SPIRead(deviceIndex, nullptr, 0, (BYTE*)recv.data(), readSize);
+            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+
+            QString result;
+            for (BYTE b : recv)
+                result += QString("0x%1 ").arg(b, 2, 16, QChar('0')).toUpper();
+
+            result.replace("X","x");
+
+            ui->textSpiReadResult->appendPlainText(QString("[%1] Read : %2")
+                                                   .arg(QTime::currentTime().toString("HH:mm:ss.zzz")).arg(result.trimmed()));
+
+
+             //QCoreApplication::processEvents();
+             //QThread::msleep(1);
+        }
+
+        ++iteration;
+        if (!repeatEnable || (repeatCount > 0 && iteration >= repeatCount)) break;
+        QCoreApplication::processEvents();
         if (!ui->chkReadRepeatEnable->isChecked()) break;
         QThread::msleep(repeatInterval);
     }
@@ -403,7 +528,7 @@ void MainWindow::on_btnLoadReadCmdList_clicked()
     ui->comboReadCmdList->clear();
     ui->comboReadCmdList->setProperty("hexList", QVariant());   // 清旗標
 
-    auto list = loadCmdFile("SPI_READ_CMD_LIST.txt");
+    auto list = loadCmdFile("SPI_READ_ONE_CMD_LIST.txt");
     QVariantList hexList;
     for (const auto &p : list) {
         ui->comboReadCmdList->addItem(p.first);
@@ -492,4 +617,32 @@ void MainWindow::onWriteDataChosen(const QString &)
         ui->textWriteData->setPlainText(hexList[idx].toString());
     }
 }
+
+void MainWindow::on_btnLoadReadCmdSet_clicked()
+{
+    loadReadCmdSet();
+    loadReadCmdList();
+
+    // ⚠️ 若成功載入至少一筆 SET，就選第一筆（index = 0）
+    if (ui->comboReadCmdSet->count() > 0) {
+        ui->comboReadCmdSet->setCurrentIndex(0);     // 會自動觸發 on_comboReadCmdSet_currentIndexChanged
+    } else {
+        ui->comboReadCmdSet->setCurrentIndex(-1);    // 沒資料就清空
+        ui->listViewReadCmds->setModel(nullptr);
+    }
+}
+
+void MainWindow::on_comboReadCmdSet_currentIndexChanged(int index)
+{
+    if (index < 0) return;
+
+    int setId = ui->comboReadCmdSet->itemData(index).toInt();
+    QStringList cmdList = mapSetToCmds.values(setId);
+
+    if (cmdListModel) delete cmdListModel;
+    cmdListModel = new QStringListModel(cmdList, this);
+    ui->listViewReadCmds->setModel(cmdListModel);
+}
+
+
 

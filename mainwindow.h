@@ -6,6 +6,9 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QList>
+#include <QMap>
+#include <QStringListModel>
 #include "usb2uis_interface.h"
 
 QT_BEGIN_NAMESPACE
@@ -24,6 +27,7 @@ private slots:
     void on_btnConnect_clicked();
     void on_btnApplyConfig_clicked();
     void on_btnSpiRead_clicked();
+    void on_btnSpiRead2_clicked();
     void on_btnSpiWrite_clicked();
     void on_btnClearResult_clicked();
     // 按鈕
@@ -35,6 +39,8 @@ private slots:
     void onReadCmdChosen(const QString &);
     void onWriteCmdChosen(const QString &);
     void onWriteDataChosen(const QString &);
+    void on_btnLoadReadCmdSet_clicked();
+    void on_comboReadCmdSet_currentIndexChanged(int index);
 
 private:
     Ui::MainWindow *ui;
@@ -45,5 +51,11 @@ private:
     bool parseHexString(const QString& input, QByteArray& output);
     void delayBlockingMs(int ms);
     void delayBlockingUs(int usec);
+    void loadReadCmdSet();
+    void loadReadCmdList();
+
+    QMap<int, QString> mapSetDescription;             // SET編號 → 註解
+    QMultiMap<int, QString> mapSetToCmds;             // SET編號 → HEX字串
+    QStringListModel *cmdListModel = nullptr;         // ListView 模型
 };
 #endif // MAINWINDOW_H
