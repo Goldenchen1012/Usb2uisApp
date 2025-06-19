@@ -411,6 +411,11 @@ void MainWindow::on_btnLoadReadCmdList_clicked()
     }
     ui->comboReadCmdList->setProperty("hexList", hexList);
     ui->comboReadCmdList->setCurrentIndex(-1);
+
+    if (!list.isEmpty()) {
+        ui->comboReadCmdList->setCurrentIndex(0);
+        ui->lineReadCmd->setText(list[0].second);
+    }
 }
 
 /* Combo 被選中 → 將 HEX 填入 lineReadCmd */
@@ -430,12 +435,18 @@ void MainWindow::on_btnLoadWriteCmdList_clicked()
     ui->comboWriteCmdList->clear();
     QVariantList hexList;
 
-    for (const auto &p : loadCmdFile("SPI_WRITE_CMD_LIST.txt")) {
+    auto list = loadCmdFile("SPI_WRITE_CMD_LIST.txt");
+    for (const auto &p : list) {
         ui->comboWriteCmdList->addItem(p.first);
         hexList << p.second;
     }
     ui->comboWriteCmdList->setProperty("hexList", hexList);
     ui->comboWriteCmdList->setCurrentIndex(-1);
+
+    if (!list.isEmpty()) {
+        ui->comboWriteCmdList->setCurrentIndex(0);
+        ui->lineWriteCmd->setText(list[0].second);
+    }
 }
 
 /* Combo 被選中 → 將 HEX 填入 lineWriteCmd */
@@ -447,6 +458,7 @@ void MainWindow::onWriteCmdChosen(const QString &)
         ui->lineWriteCmd->clear();
         ui->lineWriteCmd->setText(hexList[idx].toString());
     }
+
 }
 
 /* --------- ③ 讀取 WRITE-DATA 清單按鈕 ---------- */
@@ -455,12 +467,19 @@ void MainWindow::on_btnLoadWriteDataList_clicked()
     ui->comboWriteDataList->clear();
     QVariantList hexList;
 
-    for (const auto &p : loadCmdFile("SPI_WRITE_DATA_LIST.txt")) {
+    auto list = loadCmdFile("SPI_WRITE_DATA_LIST.txt");
+    for (const auto &p : list) {
         ui->comboWriteDataList->addItem(p.first);
         hexList << p.second;
     }
     ui->comboWriteDataList->setProperty("hexList", hexList);
     ui->comboWriteDataList->setCurrentIndex(-1);
+
+
+    if (!list.isEmpty()) {
+        ui->comboWriteDataList->setCurrentIndex(0);
+        ui->textWriteData->setPlainText(list[0].second);
+    }
 }
 
 /* Combo 被選中 → 將 HEX 填入 textWriteData (多行元件) */
