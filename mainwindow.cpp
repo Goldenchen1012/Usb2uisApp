@@ -14,8 +14,17 @@
 #include <QRegularExpression>
 
 
-#define EMULATOR_APP_NAME_STR         QString("Usb2uisApp")
-#define EMULATOR_APP_VERSION_STR      QString("V1.0")
+#define USB2UIS_APP_NAME_STR         QString("Usb2uisApp")
+#define USB2UIS_APP_VERSION_STR      QString("V1.2")
+
+#define USB2UIS_GPIO_IO1_MASKBIT         (~0x01)
+#define USB2UIS_GPIO_IO2_MASKBIT         (~0x02)
+#define USB2UIS_GPIO_IO3_MASKBIT         (~0x04)
+#define USB2UIS_GPIO_IO4_MASKBIT         (~0x08)
+#define USB2UIS_GPIO_IO5_MASKBIT         (~0x10)
+#define USB2UIS_GPIO_IO6_MASKBIT         (~0x20)
+#define USB2UIS_GPIO_IO7_MASKBIT         (~0x40)
+#define USB2UIS_GPIO_IO8_MASKBIT         (~0x80)
 
 BYTE deviceIndex = 0;
 
@@ -90,10 +99,39 @@ void MainWindow::loadReadCmdList()
         if (m.hasMatch() && m.captured(1) == "1") {
             int setId = m.captured(2).toInt();
             QString hex = m.captured(3).trimmed();
-             listSetCmdsOrdered.append(qMakePair(setId, hex));
+            listSetCmdsOrdered.append(qMakePair(setId, hex));
         }
     }
 }
+
+void MainWindow::GpioSet(eTypeGPIO_IO_PORT eGpio)
+{
+    BYTE value;         // 1=High, 0 = Low
+    BYTE mask;
+
+    if (!deviceConnected) return;
+
+    value = 0;
+    value |=(1<<eGpio);
+    mask = (~value);
+
+    Usb2UisInterface::USBIO_GPIOWrite(deviceIndex, value, mask);
+}
+
+void MainWindow::GpioClear(eTypeGPIO_IO_PORT eGpio)
+{
+    BYTE value;         // 1=High, 0 = Low
+    BYTE mask;
+
+    if (!deviceConnected) return;
+
+    value = 0;
+    value |=(1<<eGpio);
+    mask = (~value);
+
+    Usb2UisInterface::USBIO_GPIOWrite(deviceIndex, ~value, mask);
+}
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -101,7 +139,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    setWindowTitle(EMULATOR_APP_NAME_STR + " " + EMULATOR_APP_VERSION_STR);
+    setWindowTitle(USB2UIS_APP_NAME_STR + " " + USB2UIS_APP_VERSION_STR);
 
     // 初始化DLL
     if (!Usb2UisInterface::init()) {
@@ -203,6 +241,15 @@ void MainWindow::on_btnApplyConfig_clicked()
     } else {
         QMessageBox::information(this, "成功", "SPI 設定成功");
     }
+
+    BYTE dir = 0b00000000;                  // IO1(PIN J7-10)   bit1/0 = 0(output), 其餘1(input)
+    if(!Usb2UisInterface::USBIO_SetGPIOConfig(deviceIndex, dir)){
+         QMessageBox::warning(this, "GPIO", "GPIO 設定Fail");
+    }
+
+    //Gpio set High
+    GpioSet(USB2UIS_GPIO_IO1);
+    GpioSet(USB2UIS_GPIO_IO2);
 }
 
 void MainWindow::on_btnSpiRead_clicked()
@@ -371,8 +418,8 @@ void MainWindow::on_btnSpiRead2_clicked()
                                                    .arg(QTime::currentTime().toString("HH:mm:ss.zzz")).arg(result.trimmed()));
 
 
-             //QCoreApplication::processEvents();
-             //QThread::msleep(1);
+            //QCoreApplication::processEvents();
+            //QThread::msleep(1);
         }
 
         ++iteration;
@@ -656,5 +703,25 @@ void MainWindow::on_comboReadCmdSet_currentIndexChanged(int index)
     ui->listViewReadCmds->setModel(cmdListModel);
 }
 
+void MainWindow::on_pushButton_clicked()
+{
+    //BYTE value =0b00000001;          // 1=High, 0 = Low
+    //BYTE mask = 0b11111110;          // 僅寫入 Bit0
+    //Usb2UisInterface::USBIO_GPIOWrite(deviceIndex, value, mask);
 
+    GpioSet(USB2UIS_GPIO_IO1);
+    GpioSet(USB2UIS_GPIO_IO2);
+
+}
+
+
+void MainWindow::on_pushButton_2_clicked()
+{
+    //BYTE value =0b00000000;          // 1=High, 0 = Low
+    //BYTE mask = 0b11111110;          // 僅寫入 Bit0
+    //Usb2UisInterface::USBIO_GPIOWrite(deviceIndex, value, mask);
+
+    GpioClear(USB2UIS_GPIO_IO1);
+    GpioClear(USB2UIS_GPIO_IO2);
+}
 

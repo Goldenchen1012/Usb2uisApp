@@ -9,6 +9,11 @@ bool (__stdcall *Usb2UisInterface::pSPIRead)(BYTE, BYTE*, BYTE, BYTE*, WORD) = n
 bool (__stdcall *Usb2UisInterface::pSPIWrite)(BYTE, BYTE*, BYTE, BYTE*, WORD) = nullptr;
 bool (__stdcall *Usb2UisInterface::pSetCE)(BYTE, bool) = nullptr;
 
+bool  (__stdcall *Usb2UisInterface::pGetGPIOCfg)   (BYTE,BYTE*)           = nullptr;
+bool  (__stdcall *Usb2UisInterface::pSetGPIOCfg)   (BYTE,BYTE)            = nullptr;
+bool  (__stdcall *Usb2UisInterface::pGPIORead)     (BYTE,BYTE*)           = nullptr;
+bool  (__stdcall *Usb2UisInterface::pGPIOWrite)    (BYTE,BYTE,BYTE)       = nullptr;
+
 bool Usb2UisInterface::init(const QString &dllPath)
 {
     m_lib.setFileName(dllPath);
@@ -22,7 +27,13 @@ bool Usb2UisInterface::init(const QString &dllPath)
 
     pSetCE = (bool (__stdcall*)(BYTE, bool)) m_lib.resolve("USBIO_SetCE");
 
-    return pOpenDevice && pCloseDevice && pSPISetConfig && pSPIRead && pSPIWrite && pSetCE;
+    pGetGPIOCfg    = (bool (__stdcall*)(BYTE,BYTE*))          m_lib.resolve("USBIO_GetGPIOConfig");
+    pSetGPIOCfg    = (bool (__stdcall*)(BYTE,BYTE))           m_lib.resolve("USBIO_SetGPIOConfig");
+    pGPIORead      = (bool (__stdcall*)(BYTE,BYTE*))          m_lib.resolve("USBIO_GPIORead");
+    pGPIOWrite     = (bool (__stdcall*)(BYTE,BYTE,BYTE))      m_lib.resolve("USBIO_GPIOWrite");
+
+    return(pOpenDevice && pCloseDevice && pSPISetConfig && pSPIRead && pSPIWrite && pSetCE &&
+           pGetGPIOCfg && pSetGPIOCfg && pGPIORead && pGPIOWrite);
 }
 
 BYTE Usb2UisInterface::USBIO_OpenDevice() {
@@ -47,4 +58,20 @@ bool Usb2UisInterface::USBIO_SPIWrite(BYTE index, BYTE* cmd, BYTE cmdSize, BYTE*
 
 bool Usb2UisInterface::USBIO_SetCE(BYTE index, bool high) {
     return pSetCE && pSetCE(index, high);
+}
+
+bool Usb2UisInterface::USBIO_GetGPIOConfig(BYTE i,BYTE *d){
+    return pGetGPIOCfg && pGetGPIOCfg(i,d);
+}
+
+bool Usb2UisInterface::USBIO_SetGPIOConfig(BYTE i,BYTE  d){
+    return pSetGPIOCfg && pSetGPIOCfg(i,d);
+}
+
+bool Usb2UisInterface::USBIO_GPIORead(BYTE i,BYTE *v){
+    return pGPIORead   && pGPIORead(i,v);
+}
+
+bool Usb2UisInterface::USBIO_GPIOWrite(BYTE i,BYTE  v,BYTE m){
+    return pGPIOWrite  && pGPIOWrite(i,v,m);
 }

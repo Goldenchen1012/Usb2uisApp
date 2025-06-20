@@ -15,6 +15,18 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
+
+typedef  enum{
+    USB2UIS_GPIO_IO1 = 0,
+    USB2UIS_GPIO_IO2,
+    USB2UIS_GPIO_IO3,
+    USB2UIS_GPIO_IO4,
+    USB2UIS_GPIO_IO5,
+    USB2UIS_GPIO_IO6,
+    USB2UIS_GPIO_IO7,
+    USB2UIS_GPIO_IO8,
+}eTypeGPIO_IO_PORT;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -42,6 +54,10 @@ private slots:
     void on_btnLoadReadCmdSet_clicked();
     void on_comboReadCmdSet_currentIndexChanged(int index);
 
+    void on_pushButton_clicked();
+
+    void on_pushButton_2_clicked();
+
 private:
     Ui::MainWindow *ui;
 
@@ -53,6 +69,9 @@ private:
     void delayBlockingUs(int usec);
     void loadReadCmdSet();
     void loadReadCmdList();
+    void GpioSet(eTypeGPIO_IO_PORT eGpio);
+    void GpioClear(eTypeGPIO_IO_PORT eGpio);
+
 
     QMap<int, QString> mapSetDescription;             // SET編號 → 註解
     QList<QPair<int, QString>> listSetCmdsOrdered;    // 保留原始順序, SET編號 → HEX字串
