@@ -55,7 +55,7 @@ private:
     void loadReadCmdList();
 
     QMap<int, QString> mapSetDescription;             // SET編號 → 註解
-    QMultiMap<int, QString> mapSetToCmds;             // SET編號 → HEX字串
+    QList<QPair<int, QString>> listSetCmdsOrdered;    // 保留原始順序, SET編號 → HEX字串
     QStringListModel *cmdListModel = nullptr;         // ListView 模型
 };
 #endif // MAINWINDOW_H

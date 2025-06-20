@@ -77,7 +77,7 @@ void MainWindow::loadReadCmdSet()
 
 void MainWindow::loadReadCmdList()
 {
-    mapSetToCmds.clear();
+    listSetCmdsOrdered.clear();
 
     QFile f(QCoreApplication::applicationDirPath() + "/SPI_READ_CMD_LIST.txt");
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return;
@@ -90,7 +90,7 @@ void MainWindow::loadReadCmdList()
         if (m.hasMatch() && m.captured(1) == "1") {
             int setId = m.captured(2).toInt();
             QString hex = m.captured(3).trimmed();
-            mapSetToCmds.insert(setId, hex);
+             listSetCmdsOrdered.append(qMakePair(setId, hex));
         }
     }
 }
@@ -310,7 +310,13 @@ void MainWindow::on_btnSpiRead2_clicked()
     }
 
     int setId = ui->comboReadCmdSet->itemData(setIndex).toInt();
-    QStringList cmdList = mapSetToCmds.values(setId);
+    QStringList cmdList;
+
+    for (const auto& pair : listSetCmdsOrdered) {
+        if (pair.first == setId)
+            cmdList << pair.second;
+    }
+
     if (cmdList.isEmpty()) return;
 
     int repeatCount = ui->lineReadRepeatCount->text().toInt();
@@ -637,7 +643,13 @@ void MainWindow::on_comboReadCmdSet_currentIndexChanged(int index)
     if (index < 0) return;
 
     int setId = ui->comboReadCmdSet->itemData(index).toInt();
-    QStringList cmdList = mapSetToCmds.values(setId);
+    QStringList cmdList;
+
+    for (const auto& pair : listSetCmdsOrdered) {
+        if (pair.first == setId) {
+            cmdList << pair.second;
+        }
+    }
 
     if (cmdListModel) delete cmdListModel;
     cmdListModel = new QStringListModel(cmdList, this);
