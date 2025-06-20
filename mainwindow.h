@@ -58,11 +58,16 @@ private slots:
 
     void on_pushButton_2_clicked();
 
+    void on_rdoNorth_clicked();
+
+    void on_rdoSouth_clicked();
+
 private:
     Ui::MainWindow *ui;
 
     bool deviceConnected = false;
     BYTE deviceIndex = 0xFF;
+    bool bDirNorth = true;
 
     bool parseHexString(const QString& input, QByteArray& output);
     void delayBlockingMs(int ms);
@@ -71,7 +76,7 @@ private:
     void loadReadCmdList();
     void GpioSet(eTypeGPIO_IO_PORT eGpio);
     void GpioClear(eTypeGPIO_IO_PORT eGpio);
-
+    void SpiDirectionHighLow(bool bDirNorth, bool bHigh);
 
     QMap<int, QString> mapSetDescription;             // SET編號 → 註解
     QList<QPair<int, QString>> listSetCmdsOrdered;    // 保留原始順序, SET編號 → HEX字串

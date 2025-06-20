@@ -118,6 +118,26 @@ void MainWindow::GpioSet(eTypeGPIO_IO_PORT eGpio)
     Usb2UisInterface::USBIO_GPIOWrite(deviceIndex, value, mask);
 }
 
+void MainWindow::SpiDirectionHighLow(bool bDirNorth, bool bHigh){
+    if(bDirNorth == true)
+    {
+        GpioSet(USB2UIS_GPIO_IO1);
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, bHigh);
+    }
+    else
+    {
+        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+        if(bHigh == true)
+        {
+            GpioSet(USB2UIS_GPIO_IO1);
+        }
+        else
+        {
+            GpioClear(USB2UIS_GPIO_IO1);
+        }
+    }
+}
+
 void MainWindow::GpioClear(eTypeGPIO_IO_PORT eGpio)
 {
     BYTE value;         // 1=High, 0 = Low
@@ -197,6 +217,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnLoadReadCmdSet, &QPushButton::clicked, this, &MainWindow::on_btnLoadReadCmdSet_clicked);
     connect(ui->comboReadCmdSet, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::on_comboReadCmdSet_currentIndexChanged);
 
+    //預設為北向
+    ui->rdoNorth->setChecked(true);
+    bDirNorth = true;
 }
 
 MainWindow::~MainWindow()
@@ -236,20 +259,22 @@ void MainWindow::on_btnApplyConfig_clicked()
     DWORD timeout = (ui->lineWriteTimeout->text().toUShort() << 16) |
             ui->lineReadTimeout->text().toUShort();
 
-    if (!Usb2UisInterface::USBIO_SPISetConfig(deviceIndex, configByte, timeout)) {
-        QMessageBox::warning(this, "錯誤", "SPI 設定失敗");
-    } else {
-        QMessageBox::information(this, "成功", "SPI 設定成功");
-    }
 
-    BYTE dir = 0b00000000;                  // IO1(PIN J7-10)   bit1/0 = 0(output), 其餘1(input)
+    BYTE dir = 0b00000000;     // IO1(PIN J7-10)   bit1/0 = 0(output), 其餘1(input)
     if(!Usb2UisInterface::USBIO_SetGPIOConfig(deviceIndex, dir)){
-         QMessageBox::warning(this, "GPIO", "GPIO 設定Fail");
+        QMessageBox::warning(this, "GPIO", "GPIO 設定Fail");
     }
 
     //Gpio set High
     GpioSet(USB2UIS_GPIO_IO1);
     GpioSet(USB2UIS_GPIO_IO2);
+
+    if (!Usb2UisInterface::USBIO_SPISetConfig(deviceIndex, configByte, timeout)) {
+        QMessageBox::warning(this, "錯誤", "Device 設定失敗");
+    } else {
+        QMessageBox::information(this, "成功", "Device 設定成功");
+    }
+
 }
 
 void MainWindow::on_btnSpiRead_clicked()
@@ -280,20 +305,20 @@ void MainWindow::on_btnSpiRead_clicked()
         // Step 1: 傳送 Dummy 0xFF
         //------------------------------------------------------------------------------------
         // ✅ 拉 LOW: 啟動傳輸階段
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+        SpiDirectionHighLow(bDirNorth, false); //Low
 
         if (dummyCount > 0) {
             QByteArray dummy(dummyCount, char(0xFF));
             if (!Usb2UisInterface::USBIO_SPIWrite(deviceIndex, nullptr, 0, (BYTE*)dummy.data(), dummy.size()))
             {
                 QMessageBox::warning(this, "錯誤", "Dummy Bytes 傳送失敗");
-                Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+                SpiDirectionHighLow(bDirNorth, true); //High
                 return;
             }
         }
 
         delayBlockingUs(500);
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+        SpiDirectionHighLow(bDirNorth, true); //High
         delayBlockingMs(1);            //Refer AFE Spec.
         //+-----------------------------------------------------------------------------------
 
@@ -301,7 +326,7 @@ void MainWindow::on_btnSpiRead_clicked()
         // Step 2: 傳送命令後延遲
         //------------------------------------------------------------------------------------
         // ✅ 拉 LOW: 啟動傳輸階段
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+        SpiDirectionHighLow(bDirNorth, false); //Low
 
         QByteArray dummyBuffer;
         Usb2UisInterface::USBIO_SPIWrite(deviceIndex,(BYTE*)cmd.data(), cmd.size(), nullptr, 0);
@@ -317,13 +342,13 @@ void MainWindow::on_btnSpiRead_clicked()
         if (!Usb2UisInterface::USBIO_SPIRead(deviceIndex,
                                              nullptr, 0, (BYTE*)recvBuffer.data(), readSize)) {
             QMessageBox::warning(this, "錯誤", "SPI讀取失敗");
-            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);  // 拉回 HIGH
+            SpiDirectionHighLow(bDirNorth, true); //High
             return;
         }
         //------------------------------------------------------------------------------------
 
         // ✅ 拉 HIGH: 結束傳輸階段
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+        SpiDirectionHighLow(bDirNorth, true); //High
 
         QString result;
         for (BYTE b : recvBuffer)
@@ -388,25 +413,25 @@ void MainWindow::on_btnSpiRead2_clicked()
             }
 
             // Dummy
-            Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+            SpiDirectionHighLow(bDirNorth, false); //Low
             if (dummyCount > 0) {
                 QByteArray dummy(dummyCount, char(0xFF));
                 Usb2UisInterface::USBIO_SPIWrite(deviceIndex, nullptr, 0, (BYTE*)dummy.data(), dummyCount);
             }
+
             delayBlockingUs(500);
-            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
-            //delayBlockingMs(1);
+            SpiDirectionHighLow(bDirNorth, true); //High
             delayBlockingUs(500);
 
             // 指令傳送
-            Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+            SpiDirectionHighLow(bDirNorth, false); //Low
             Usb2UisInterface::USBIO_SPIWrite(deviceIndex, (BYTE*)cmd.data(), cmd.size(), nullptr, 0);
             if (delayMs > 0) delayBlockingMs(delayMs);
 
             QByteArray recv;
             recv.resize(readSize);
             Usb2UisInterface::USBIO_SPIRead(deviceIndex, nullptr, 0, (BYTE*)recv.data(), readSize);
-            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+            SpiDirectionHighLow(bDirNorth, true); //High
 
             QString result;
             for (BYTE b : recv)
@@ -462,33 +487,34 @@ void MainWindow::on_btnSpiWrite_clicked()
         // Step 1: 傳送 Dummy 0xFF
         //------------------------------------------------------------------------------------
         // ✅ 拉 LOW: 啟動傳輸階段
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+        SpiDirectionHighLow(bDirNorth, false); //Low
 
         if (dummyCount > 0) {
             QByteArray dummy(dummyCount, char(0xFF));
             if (!Usb2UisInterface::USBIO_SPIWrite(deviceIndex, nullptr, 0, (BYTE*)dummy.data(), dummy.size()))
             {
                 QMessageBox::warning(this, "錯誤", "Dummy Bytes 傳送失敗");
-                Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+                SpiDirectionHighLow(bDirNorth, true); //High
                 return;
             }
         }
 
         delayBlockingUs(500);
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
-        delayBlockingMs(1);            //Refer AFE Spec.
+        SpiDirectionHighLow(bDirNorth, true); //High
+        delayBlockingUs(500);                //Refer AFE Spec.
         //+-----------------------------------------------------------------------------------
 
         // Step 2: 傳送命令後延遲
         //------------------------------------------------------------------------------------
         // ✅ 拉 LOW: 啟動傳輸階段
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+        SpiDirectionHighLow(bDirNorth, false); //Low
+        delayBlockingUs(500);
 
         Usb2UisInterface::USBIO_SPIWrite(deviceIndex,
                                          (BYTE*)cmd.data(), cmd.size(), nullptr, 0);
 
 
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, false);
+        delayBlockingUs(500);
 
         // 延遲（保持 CS LOW）
         if (delayMs > 0)
@@ -502,15 +528,15 @@ void MainWindow::on_btnSpiWrite_clicked()
                                               nullptr, 0, (BYTE*)data.data(), data.size()))
         {
             QMessageBox::warning(this, "錯誤", "SPI資料寫入失敗");
-            Usb2UisInterface::USBIO_SetCE(deviceIndex, true);  // 拉回 HIGH
+            SpiDirectionHighLow(bDirNorth, true); //High
             return;
         }
-        delayBlockingUs(500); //必須先阻塞時間， 傳送時序問題延遲500us以上
+
+        delayBlockingMs(2); //注意~~~MUST 必須先阻塞時間， 傳送時序問題延遲500us以上(寫入資料太多時，請加長時間)
 
         // ✅ 拉 HIGH: 結束傳輸階段
-        Usb2UisInterface::USBIO_SetCE(deviceIndex, true);
+        SpiDirectionHighLow(bDirNorth, true); //High
         //------------------------------------------------------------------------------------
-
 
         // 顯示寫入資料 HEX 字串到 textSpiReadResult
         QString result;
@@ -723,5 +749,17 @@ void MainWindow::on_pushButton_2_clicked()
 
     GpioClear(USB2UIS_GPIO_IO1);
     GpioClear(USB2UIS_GPIO_IO2);
+}
+
+
+void MainWindow::on_rdoNorth_clicked()
+{
+    bDirNorth = true;
+}
+
+
+void MainWindow::on_rdoSouth_clicked()
+{
+    bDirNorth = false;
 }
 
