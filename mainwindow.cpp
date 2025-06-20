@@ -729,29 +729,6 @@ void MainWindow::on_comboReadCmdSet_currentIndexChanged(int index)
     ui->listViewReadCmds->setModel(cmdListModel);
 }
 
-void MainWindow::on_pushButton_clicked()
-{
-    //BYTE value =0b00000001;          // 1=High, 0 = Low
-    //BYTE mask = 0b11111110;          // 僅寫入 Bit0
-    //Usb2UisInterface::USBIO_GPIOWrite(deviceIndex, value, mask);
-
-    GpioSet(USB2UIS_GPIO_IO1);
-    GpioSet(USB2UIS_GPIO_IO2);
-
-}
-
-
-void MainWindow::on_pushButton_2_clicked()
-{
-    //BYTE value =0b00000000;          // 1=High, 0 = Low
-    //BYTE mask = 0b11111110;          // 僅寫入 Bit0
-    //Usb2UisInterface::USBIO_GPIOWrite(deviceIndex, value, mask);
-
-    GpioClear(USB2UIS_GPIO_IO1);
-    GpioClear(USB2UIS_GPIO_IO2);
-}
-
-
 void MainWindow::on_rdoNorth_clicked()
 {
     bDirNorth = true;

@@ -54,12 +54,7 @@ private slots:
     void on_btnLoadReadCmdSet_clicked();
     void on_comboReadCmdSet_currentIndexChanged(int index);
 
-    void on_pushButton_clicked();
-
-    void on_pushButton_2_clicked();
-
     void on_rdoNorth_clicked();
-
     void on_rdoSouth_clicked();
 
 private:
